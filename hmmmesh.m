@@ -49,8 +49,6 @@ function [macro_mesh, micro_mesh]=hmmmesh(n,g, opts)
          micro_mesh.p=meshp; micro_mesh.e=meshe; micro_mesh.t=mesht; micro_mesh.mp=meshmp;
         
     end
-    xx=0:opts.dx:1;
-    x=meshgrid(xx);y=x';
    
 
 

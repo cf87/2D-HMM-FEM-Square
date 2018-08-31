@@ -13,20 +13,21 @@ pde.alpha       =ones(1, pde.K);
 pde.rhs = '1';
 
 %% a^epsilon and HMM optionz
-epsilon     = 1/200;
-a           = @(x1,x2, y1,y2) 1+x1^2+x2*sin(2*pi*y2);
-aeps        = @(x,y) a(x(1),x(2), y(1)/epsilon, y(2)/epsilon);
+epsilon     = 1/100;
+a           = @(x1, x2, y1, y2) 1.1 + sin(2*pi*y2);
+aeps        = @(x,y) a(x,y, x/epsilon, y/epsilon);
 
 
 
-cellSize    =  3;
+cellSize    =  2;
 nMicro      = 30;
-nMacro                  = 5;
-dx              = 1/nMacro;
-load('g'); % I used pdetool to generate a square and saved it as the file 'g.mat';
-hmmopts     = struct('epsilon', epsilon, 'nMicro',nMicro, 'dx',dx, 'deltax',cellSize*epsilon,'deltay',cellSize*epsilon, 'cellSize', cellSize);
+nMacro                  = 15;
 
+load('g'); % I used pdetool to generate a square and saved it as the file 'g.mat';
+hmmopts     = struct('epsilon', epsilon, 'nMicro',nMicro, 'deltax',cellSize*epsilon,'deltay',cellSize*epsilon, 'cellSize', cellSize);
+%%
 [macro_mesh, micro_mesh]=hmmmesh(nMacro,g, hmmopts);
+%%
 figure;
 pdemesh(micro_mesh.p, micro_mesh.e, micro_mesh.t); hold on;
 pdemesh(macro_mesh.p, macro_mesh.e, macro_mesh.t);
@@ -37,7 +38,6 @@ switch pde.bc
     case 'dirichlet'
         b     = dirichletbc(pde.g);
     case 'neumann'
-        %%neumann
         b     = neumannbc(pde.g);
 end
 

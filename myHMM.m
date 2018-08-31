@@ -5,14 +5,14 @@ rhs = pde.rhs;
 
 % Assemble Macroscopic stiffness matrix%
 
-%%dirichlet
+
 if ~isfield(opts, 'bc'), opts.bc='dirichlet'; end;
 switch opts.bc
     case 'dirichlet'
         bc1     = dirichletbc(sprintf('%d*x+%d*y', 1, 0));
         bc2     = dirichletbc(sprintf('%d*x+%d*y', 0, 1));
     case 'neumann'
-        %%neumann
+        
         bc1     = neumannbc(sprintf('%d*nx+%d*ny', 1, 0));
         bc2     = neumannbc(sprintf('%d*nx+%d*ny', 0, 1));
 end
@@ -56,7 +56,7 @@ yy=macro_mesh.mp(2,:);
 A=A';
 [K,M,F]=assema(macro_mesh.p,macro_mesh.t,A,pde.sigma(xx,yy),rhs);
 u   =   assempde(K,M,F,pde.Q,pde.G,pde.H,pde.R) ;
-%pdesurf(M_p,M_t,uhmm)
+
 end
 
 function VV=blckdiag(V1, V2, V3, V4)
