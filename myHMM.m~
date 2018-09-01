@@ -1,0 +1,85 @@
+function [u, A] = myHMM(macro_mesh, micro_mesh, aeps,pde, opts)
+
+
+% The microscopic cell problems satisfy $\langle nabla \phi^\epsilon
+% \rangle_{I_\delta} = G$ for some fixed vector $G$
+
+% The cell problems either have Dirichlet or Neumann BC
+if ~isfield(opts, 'bc'), opts.bc='dirichlet'; end;
+switch opts.bc
+    case 'dirichlet'
+        bc1     = dirichletbc(sprintf('%d*x+%d*y', 1, 0));
+        bc2     = dirichletbc(sprintf('%d*x+%d*y', 0, 1));
+    case 'neumann'
+        
+        bc1     = neumannbc(sprintf('%d*nx+%d*ny', 1, 0));
+        bc2     = neumannbc(sprintf('%d*nx+%d*ny', 0, 1));
+end
+
+
+meshp=micro_mesh.p;
+meshe=micro_mesh.e;
+mesht=micro_mesh.t;
+meshmp=micro_mesh.mp;
+mesha=aeps(meshmp(1,:), meshmp(2,:)); %multiscale coefficient
+
+% Cell problems (there is one in each dimension
+
+     [K,M,F]         = assema(meshp,mesht,mesha,'0','0');
+     [Q1,G1,H1,R1]   = assemb(bc1,meshp,meshe);
+     [Q2,G2,H2,R2]   = assemb(bc2,meshp,meshe);
+     
+     phi1            = assempde(K,M,F,Q1,G1,H1,R1) ;
+     phi2            = assempde(K,M,F,Q2,G2,H2,R2) ;
+
+[ phi1x,phi1y ] = pdegrad(meshp,mesht,phi1);
+[ phi2x,phi2y ] = pdegrad(meshp,mesht,phi2);
+rs=@(x) reshape(x, [length(x)/length(macro_mesh.mp) length(macro_mesh.mp) ]);
+
+[ agx_phi1,agy_phi1 ] = pdecgrad(meshp,mesht,mesha,phi1);
+[ agx_phi2,agy_phi2 ] = pdecgrad(meshp,mesht,mesha,phi2);
+cell_avg = @(x) mean(rs(x),1);
+
+V1=cell_avg(phi1x); V2=cell_avg(phi2x); V3=cell_avg(phi1y); V4=cell_avg(phi2y);
+
+V=blckdiag(V1, V2, V3, V4);
+AV1=cell_avg(agx_phi1); AV2=cell_avg(agx_phi2); AV3=cell_avg(agy_phi1); AV4=cell_avg(agy_phi2);
+AV=blckdiag(AV1, AV2, AV3, AV4);
+A=unblckdiag(AV/V);
+
+
+
+%% Macroscopic solution
+
+A=A';
+% Assemble Macroscopic stiffness matrix
+[K,M,F]=assema(macro_mesh.p,macro_mesh.t,A,0,pde.f);
+u   =   assempde(K,M,F,pde.Q,pde.G,pde.H,pde.R) ;
+
+end
+
+function VV=blckdiag(V1, V2, V3, V4)
+row=@(x,N)x(1:N);
+Vdiag=row([V1; V4], 2*length(V1));
+Vp=row([V2; 0*V2], length(Vdiag)-1);
+Vm=row([V3; 0*V3], length(Vdiag)-1);
+VV=diag(Vdiag)+diag(Vp, 1)+diag(Vm, -1);
+end
+
+function V=unblckdiag(VV)
+N=length(VV)/2;
+
+Vdiag=diag(VV);
+
+Vp=diag(VV,1);
+Vm=diag(VV,-1);
+
+V1=Vdiag(1:2:2*N);
+V2=Vp(1:2:2*N);
+V3=Vm(1:2:2*N); 
+V4=Vdiag(2:2:2*N);
+
+
+
+V=[V1 V2 V3 V4];
+end

@@ -1,11 +1,11 @@
-function [u, A] = myHMM(macro_mesh, micro_mesh, aeps,pde, opts)
+function [u, A_HMM] = myHMM(macro_mesh, micro_mesh, aeps,pde, opts)
+% Disclaimer: this code was written in 2014 and it appears assema and
+% assempde are now out of date.
 
-rhs = pde.rhs;
+% The microscopic cell problems satisfy $\langle nabla \phi^\epsilon
+% \rangle_{I_\delta} = G$ for some fixed vector $G$
 
-
-% Assemble Macroscopic stiffness matrix%
-
-
+% The cell problems either have Dirichlet or Neumann BC
 if ~isfield(opts, 'bc'), opts.bc='dirichlet'; end;
 switch opts.bc
     case 'dirichlet'
@@ -16,46 +16,45 @@ switch opts.bc
         bc1     = neumannbc(sprintf('%d*nx+%d*ny', 1, 0));
         bc2     = neumannbc(sprintf('%d*nx+%d*ny', 0, 1));
 end
-alpha   = pde.alpha;
 
+aeps_mp = aeps(micro_mesh.mp(1,:), micro_mesh.mp(2,:)); %multiscale coefficient a
 
+% Cell problems (there is one in each dimension)
 
-meshp=micro_mesh.p;
-meshe=micro_mesh.e;
-mesht=micro_mesh.t;
-meshmp=micro_mesh.mp;
-mesha=alpha*aeps(meshmp(1,:), meshmp(2,:));
-
-     [K,M,F]         = assema(meshp,mesht,mesha,'0','0');
-     [Q1,G1,H1,R1]   = assemb(bc1,meshp,meshe);
-     [Q2,G2,H2,R2]   = assemb(bc2,meshp,meshe);
+     [K,M,F]         = assema(micro_mesh.p,micro_mesh.t,aeps_mp,'0','0');
+     [Q1,G1,H1,R1]   = assemb(bc1,micro_mesh.p,micro_mesh.e);
+     [Q2,G2,H2,R2]   = assemb(bc2,micro_mesh.p,micro_mesh.e);
      
      phi1            = assempde(K,M,F,Q1,G1,H1,R1) ;
      phi2            = assempde(K,M,F,Q2,G2,H2,R2) ;
 
-[ phi1x,phi1y ] = pdegrad(meshp,mesht,phi1);
-[ phi2x,phi2y ] = pdegrad(meshp,mesht,phi2);
+[ phi1x,phi1y ] = pdegrad(micro_mesh.p,micro_mesh.t,phi1);
+[ phi2x,phi2y ] = pdegrad(micro_mesh.p,micro_mesh.t,phi2);
 rs=@(x) reshape(x, [length(x)/length(macro_mesh.mp) length(macro_mesh.mp) ]);
 
-[ agx_phi1,agy_phi1 ] = pdecgrad(meshp,mesht,mesha,phi1);
-[ agx_phi2,agy_phi2 ] = pdecgrad(meshp,mesht,mesha,phi2);
-cell_avg = @(x) mean(rs(x),1);
+[ agx_phi1,agy_phi1 ] = pdecgrad(micro_mesh.p,micro_mesh.t,aeps_mp,phi1);
+[ agx_phi2,agy_phi2 ] = pdecgrad(micro_mesh.p,micro_mesh.t,aeps_mp,phi2);
 
-V1=cell_avg(phi1x); V2=cell_avg(phi2x); V3=cell_avg(phi1y); V4=cell_avg(phi2y);
 
-V=blckdiag(V1, V2, V3, V4);
-AV1=cell_avg(agx_phi1); AV2=cell_avg(agx_phi2); AV3=cell_avg(agy_phi1); AV4=cell_avg(agy_phi2);
-AV=blckdiag(AV1, AV2, AV3, AV4);
-A=unblckdiag(AV/V);
+
+% Given these cell solutions we want to solve 
+% \langle a^\epsilon \nabla phi^\epsilon \rangle_{I_delta} = A_HMM \langle phi^\epsilon \rangle_{I_delta}%
+
+% First, find cell averages
+cell_avg    = @(x) mean(rs(x),1);
+V1    = cell_avg(phi1x); V2=cell_avg(phi2x); V3=cell_avg(phi1y); V4=cell_avg(phi2y);
+AV1   = cell_avg(agx_phi1); AV2=cell_avg(agx_phi2); AV3=cell_avg(agy_phi1); AV4=cell_avg(agy_phi2);
+
+%Assemble them into a large linear system and solve for A_HMM
+V       = blckdiag(V1, V2, V3, V4);
+AV      = blckdiag(AV1, AV2, AV3, AV4);
+A_HMM   = unblckdiag(AV/V);
 
 
 
 %% Macroscopic solution
-xx=macro_mesh.mp(1,:);
-yy=macro_mesh.mp(2,:);
-A=A';
-[K,M,F]=assema(macro_mesh.p,macro_mesh.t,A,pde.sigma(xx,yy),rhs);
-u   =   assempde(K,M,F,pde.Q,pde.G,pde.H,pde.R) ;
+[K,M,F] = assema(macro_mesh.p,macro_mesh.t,A_HMM',0,pde.f);
+u       = assempde(K,M,F,pde.Q,pde.G,pde.H,pde.R) ;
 
 end
 

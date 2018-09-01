@@ -1,16 +1,13 @@
 
 
-%% Quick and dirty square macroscopic mesh
-
+%% Quick and dirty HMM-FEM 2D solver
+% Want to solve $\nabla \cdot (A_HMM \nabla U_HMM) = f$ on $\Omega = [0, 1]\times
+% [0, 1]$, $U_HMM = g$ on $\partial \Omega$
 
 %%
-pde.g                = '0';
-pde.sigma          = @(x,y,l)0*x;
-pde.K                 = 1;
-pde.alpha             = 1;
-pde.omega           = 0;
-pde.alpha       =ones(1, pde.K);
-pde.rhs = '1';
+pde.g           = '0'; 
+pde.f           = '1';
+
 
 %% a^epsilon and HMM optionz
 epsilon     = 1/100;
